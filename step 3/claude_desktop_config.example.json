@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "wafer-defect": {
+      "command": "/Users/본인이름/경로/step3_mcp/.venv/bin/python3",
+      "args": ["/Users/본인이름/경로/step3_mcp/wafer_server.py"]
+    }
+  }
+}
