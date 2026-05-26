@@ -1,74 +1,90 @@
-# Step 2 — 스마트 컨트랙트 (ERC-721)
+#  웨이퍼 결함 이력 MCP·블록체인 시스템
 
-웨이퍼 결함 검사 결과를 NFT로 발행하고, 진단 결과를 온체인 이벤트로 기록하는
-`WaferRegistry` 컨트랙트를 작성·테스트·배포한다.
+블록체인실습 텀 프로젝트. 웨이퍼 결함 검사 이력을 블록체인에 위변조 없이 기록하고,
+코딩을 모르는 엔지니어도 자연어로 과거 결함 사례를 조회·대조할 수 있게 한 시스템이다.
 
-발표 자료의 **Step 3 (블록체인 연동)** 에 해당하며, 다음을 다룬다.
-- `mintWafer()` — 검사된 웨이퍼를 NFT로 민팅
-- `logDiagnosis()` — LLM/MCP 진단 결과를 온체인 기록
-- `getDiagnosis()` — 검증 흐름에서 진단 이력 조회
+흐름은 다음과 같다.
+
+```
+웨이퍼 결함 이력 데이터  →  MCP 서버(tool 4종)  →  LLM(Claude Desktop)  →  ERC-721 기록
+```
+
+- ERC-721 `WaferRegistry` 컨트랙트로 웨이퍼를 NFT로 발행하고 진단 결과를 온체인 기록
+- FastMCP 서버가 결함 진단 tool 4종을 제공, Claude Desktop에 연결
+- 엔지니어가 자연어로 질문하면 LLM이 알맞은 MCP tool을 호출
 
 ---
 
-## 0. 준비물
+## 폴더 구성
 
-- Node.js (이미 설치됨)
+| 경로 | 내용 |
+|------|------|
+| `contracts/` | `WaferRegistry` 스마트 컨트랙트 (Solidity) |
+| `scripts/` | 배포 스크립트(`deploy.js`), 시연 스크립트(`demo.js`) |
+| `test/` | 컨트랙트 테스트 코드 |
+| `step 1` | 데이터 준비 — 웨이퍼 결함 이력 데이터 |
+| `step 3` | MCP 서버 — 결함 진단 tool 4종 (Python / FastMCP) |
+| `hardhat.config.js`, `package.json` | Hardhat 프로젝트 설정 |
+| `deployed.json` | 배포된 컨트랙트 주소 (MCP 서버가 참조) |
+| `wafer_mcp_project_final.pptx` | 발표 자료 — 프로젝트 소개 |
+| `demo_results.pptx` | 발표 자료 — 시연 결과 |
+
+---
+
+## 1. 준비물
+
+- Node.js
+- Python 3
+- Claude Desktop (MCP 서버 연결용)
 - 코드 에디터 (VS Code 권장)
-- MetaMask 브라우저 확장 — Sepolia 배포 단계에서만 필요
 
 ---
 
-## 1. 프로젝트 폴더 세팅
+## 2. 스마트 컨트랙트 — 컴파일 · 테스트
 
-이 `step2_contract` 폴더를 통째로 작업 폴더에 둔다. 터미널에서:
+저장소 루트에서 의존성을 설치한다.
 
 ```bash
-cd step2_contract
 npm install
 ```
 
-`package.json` 에 적힌 의존성(hardhat 2, openzeppelin 5 등)이 설치된다.
+`package.json` 에 적힌 의존성(Hardhat 2, OpenZeppelin 5 등)이 설치된다.
 
----
-
-## 2. 컴파일 — 컨트랙트가 문법적으로 맞는지 확인
+컴파일:
 
 ```bash
 npx hardhat compile
 ```
 
-처음 실행하면 Solidity 컴파일러(solc 0.8.28)를 자동 다운로드한다.
-`Compiled 1 Solidity file successfully` 가 나오면 성공.
+`Compiled ... successfully` 가 나오면 성공이다.
+(막히면 `cache/` 와 `artifacts/` 폴더를 지우고 다시 실행한다.)
 
-> 막히면: `cache/` 와 `artifacts/` 폴더를 지우고 다시 `npx hardhat compile`.
-
----
-
-## 3. 테스트 — 컨트랙트가 의도대로 동작하는지 확인
+테스트:
 
 ```bash
 npx hardhat test
 ```
 
-`test/WaferRegistry.test.js` 의 8개 테스트가 모두 통과해야 한다.
-민팅, 이벤트 발생, 진단 기록/조회, 권한 체크를 검증한다.
-
-전부 초록색 체크가 뜨면 컨트랙트 로직은 완성된 것이다.
+`test/` 의 테스트가 모두 통과하면 컨트랙트 로직이 검증된 것이다.
+민팅, 이벤트 발생, 진단 기록·조회, 권한 체크를 확인한다.
 
 ---
 
-## 4. 로컬 네트워크에서 시연 — 배포 없이 전체 흐름 확인
+## 3. 로컬 네트워크 배포 & 시연
 
-터미널 **두 개**가 필요하다.
+이 프로젝트는 **Hardhat 로컬 네트워크**에서 동작·시연한다. 터미널 두 개가 필요하다.
 
 **터미널 A — 로컬 블록체인 켜기:**
+
 ```bash
 npx hardhat node
 ```
-20개의 테스트 계정이 출력되고, 로컬 체인이 켜진 상태로 유지된다.
+
+테스트 계정 20개가 출력되고 로컬 체인이 켜진 상태로 유지된다.
 이 터미널은 끄지 말고 그대로 둔다.
 
 **터미널 B — 배포 + 시연:**
+
 ```bash
 npx hardhat run scripts/deploy.js --network localhost
 npx hardhat run scripts/demo.js --network localhost
@@ -77,51 +93,37 @@ npx hardhat run scripts/demo.js --network localhost
 `deploy.js` 가 컨트랙트를 배포하고 주소를 `deployed.json` 에 저장한다.
 `demo.js` 가 웨이퍼 3건을 민팅 → 진단 기록 → 조회 검증까지 보여준다.
 
-여기까지 되면 **Step 2의 핵심은 끝**이다. 시연용으로는 로컬만으로도 충분하다.
+---
+
+## 4. MCP 서버 — Claude Desktop 연동
+
+`step 3` 폴더의 MCP 서버는 결함 진단 tool 4종을 제공한다.
+
+| tool | 기능 |
+|------|------|
+| `log_defect` | 결함 검사 결과를 이력 DB에 저장 |
+| `query_history` | 유사 결함 패턴의 과거 이력 조회 |
+| `classify_defect` | 결함률·패턴으로 9종 분류 |
+| `get_token_uri` | 온체인 NFT 기록 여부 확인 |
+
+원본 데이터는 로컬 서버에만 존재하며, LLM은 tool 호출로만 접근한다.
+`get_token_uri` 는 `deployed.json` 에 저장된 컨트랙트 주소를 참조한다.
+
+Claude Desktop의 MCP 설정에 `step 3` 의 서버를 등록하면,
+"Edge-Ring 패턴 결함 비슷한 사례 있어?" 같은 자연어 질문으로 tool을 호출할 수 있다.
 
 ---
 
-## 5. (선택) Sepolia 테스트넷 실제 배포
+## 5. (선택) Sepolia 테스트넷 배포
 
-발표 자료에 "Sepolia 테스트넷 배포"라고 적었으니, 가능하면 실제 배포까지 한다.
+본 프로젝트는 로컬 네트워크로 구현·시연을 완료했다.
+퍼블릭 테스트넷에서 외부 검증까지 하고 싶다면 Sepolia에 배포할 수 있다.
 
-### 5-1. MetaMask에서 테스트 지갑 준비
-- MetaMask 설치 후 새 계정 생성 (★ 실제 자산이 든 지갑 쓰지 말 것)
-- 네트워크를 **Sepolia** 로 전환
+1. MetaMask에 테스트 전용 새 계정 생성 (실제 자산이 든 지갑은 쓰지 않는다)
+2. Sepolia faucet에서 테스트 ETH 수령
+3. Alchemy 등에서 Sepolia RPC URL 발급
+4. `.env.example` 을 복사해 `.env` 작성, `SEPOLIA_RPC_URL` 과 `PRIVATE_KEY` 입력
+5. `npx hardhat run scripts/deploy.js --network sepolia` 로 배포
 
-### 5-2. 테스트 ETH 받기 (무료)
-아래 faucet 중 하나에서 본인 지갑 주소로 테스트 ETH를 받는다.
-- https://sepoliafaucet.com  (Alchemy)
-- https://www.infura.io/faucet/sepolia
-- https://faucet.quicknode.com/ethereum/sepolia
-
-0.05 ETH 정도면 배포에 충분하다.
-
-### 5-3. RPC URL 발급
-- https://www.alchemy.com 가입 → 새 앱 생성 → Network를 Ethereum Sepolia로
-- 발급된 HTTPS URL 복사
-
-### 5-4. .env 파일 작성
-```bash
-cp .env.example .env
-```
-`.env` 를 열어 `SEPOLIA_RPC_URL` 과 `PRIVATE_KEY` 를 채운다.
-
-> PRIVATE_KEY 얻는 법: MetaMask → 계정 메뉴 → 계정 세부정보 → 비공개 키 표시
-> ⚠️ `.env` 는 절대 GitHub에 올리지 말 것 (.gitignore에 이미 등록됨)
-
-### 5-5. 배포
-```bash
-npx hardhat run scripts/deploy.js --network sepolia
-npx hardhat run scripts/demo.js --network sepolia
-```
-
-출력되는 Etherscan 링크(`https://sepolia.etherscan.io/address/...`)에 들어가면
-실제 트랜잭션과 발행된 NFT를 확인할 수 있다. **이 화면이 시연의 핵심 증거물**이다.
-
----
-
-## 다음 단계
-
-`deployed.json` 에 저장된 컨트랙트 주소는 **Step 3 (MCP 서버)** 의
-`get_token_uri()` tool 이 그대로 가져다 쓴다. 이 파일을 잘 보관할 것.
+> ⚠️ `.env` 파일은 절대 GitHub에 올리지 않는다. 개인키가 노출된다.
+</file_text>
